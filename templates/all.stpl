@@ -1,0 +1,5 @@
+Keyboard events: <% for event in &keyboard_events { %>
+<%= format!("{:?}", event) %><% } %>
+
+Mouse events: <% for event in &mouse_events { %>
+<%= format!("{:?}", event) %><% } %>

@@ -1,0 +1,16 @@
+[package]
+name = "axolotl"
+version = "0.1.0"
+edition = "2018"
+license = "mpl-2.0"
+
+[dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
+console = { version = "0.14.1" }
+winit = "0.25.0"
+sailfish = "0.3.3"
+argh = "0.1.5"
+
+[[bin]]
+name = "axo"
+path = "src/main.rs"
