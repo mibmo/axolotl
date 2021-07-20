@@ -50,12 +50,14 @@ impl HandledEvent {
 mod template {
     use crate::HandledEvent;
     use sailfish::TemplateOnce;
+    use std::collections::HashMap;
 
     #[derive(Debug, TemplateOnce)]
     #[template(path = "all.stpl")]
     pub(crate) struct All {
         pub events: Vec<HandledEvent>,
         pub buffer_size: usize,
+        pub event_totals: HashMap<&'static str, usize>,
     }
 }
 
@@ -86,6 +88,11 @@ async fn tui_loop(opt: Opt, rx: Receiver<HandledEvent>) -> EResult<()> {
     variant_count.insert("MouseButton", 0);
     variant_count.insert("MouseScroll", 0);
 
+    let mut totals: HashMap<&'static str, usize> = HashMap::new();
+    totals.insert("Keyboard", 0);
+    totals.insert("MouseButton", 0);
+    totals.insert("MouseScroll", 0);
+
     while let Ok(event) = rx.recv().await {
         let variant = event.variant();
         let count = variant_count.get_mut(&variant).unwrap();
@@ -94,6 +101,7 @@ async fn tui_loop(opt: Opt, rx: Receiver<HandledEvent>) -> EResult<()> {
         }
         *count += 1;
 
+        *totals.get_mut(&variant).unwrap() += 1;
 
         // remove the first event in buffer with same variant as current event
         if let Some(first_variant_index) = event_buffer.iter().position(|event| variant == event.variant()) {
@@ -107,6 +115,7 @@ async fn tui_loop(opt: Opt, rx: Receiver<HandledEvent>) -> EResult<()> {
         let template = template::All {
             events: event_buffer.clone(),
             buffer_size,
+            event_totals: totals.clone(),
         };
         let render = template.render_once()?;
 

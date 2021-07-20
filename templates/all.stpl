@@ -13,11 +13,15 @@ events.into_iter().for_each(|event| {
 	}.push(event);
 });
 
-%>Keyboard events: <% for event in keyboard_buffer.iter().take(buffer_size) { %>
+event_totals.get("Keyboard").unwrap();
+event_totals.get("MouseButton").unwrap();
+event_totals.get("MouseScroll").unwrap();
+
+%>Keyboard events:(total: <%= event_totals.get("Keyboard").unwrap() %>) <% for event in keyboard_buffer.iter().take(buffer_size) { %>
 <%= format!("{:?}", event) %><% } %>
 
-Mouse button events: <% for event in mouse_button_buffer.iter().take(buffer_size) { %>
+Mouse button events: (total: <%= event_totals.get("MouseButton").unwrap() %>)<% for event in mouse_button_buffer.iter().take(buffer_size) { %>
 <%= format!("{:?}", event) %><% } %>
 
-Mouse scroll events: <% for event in mouse_scroll_buffer.iter().take(buffer_size) { %>
+Mouse scroll events: (total: <%= event_totals.get("MouseScroll").unwrap() %>) <% for event in mouse_scroll_buffer.iter().take(buffer_size) { %>
 <%= format!("{:?}", event) %><% } %>
