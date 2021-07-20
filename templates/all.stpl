@@ -1,5 +1,23 @@
-Keyboard events: <% for event in &keyboard_events { %>
+<% 
+use crate::HandledEvent::*;
+
+let mut keyboard_buffer = Vec::with_capacity(buffer_size * 3);
+let mut mouse_button_buffer = Vec::with_capacity(buffer_size * 3);
+let mut mouse_scroll_buffer = Vec::with_capacity(buffer_size * 3);
+
+events.into_iter().for_each(|event| {
+	match &event {
+		Keyboard(_) => &mut keyboard_buffer,
+		MouseButton { .. } => &mut mouse_button_buffer,
+		MouseScroll(_) => &mut mouse_scroll_buffer,
+	}.push(event);
+});
+
+%>Keyboard events: <% for event in keyboard_buffer.iter().take(buffer_size) { %>
 <%= format!("{:?}", event) %><% } %>
 
-Mouse events: <% for event in &mouse_events { %>
+Mouse button events: <% for event in mouse_button_buffer.iter().take(buffer_size) { %>
+<%= format!("{:?}", event) %><% } %>
+
+Mouse scroll events: <% for event in mouse_scroll_buffer.iter().take(buffer_size) { %>
 <%= format!("{:?}", event) %><% } %>

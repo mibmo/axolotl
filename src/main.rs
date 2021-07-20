@@ -5,6 +5,7 @@ use async_std::{
 };
 use console::Term;
 use sailfish::TemplateOnce;
+use std::collections::HashMap;
 use winit::{
     event::{
         ButtonId, DeviceEvent, ElementState, Event, KeyboardInput, MouseScrollDelta, WindowEvent,
@@ -13,23 +14,19 @@ use winit::{
     window::Window,
 };
 
-const DEFAULT_KEYBOARD_BUFFER_SIZE: usize = 12;
-const DEFAULT_MOUSE_BUFFER_SIZE: usize = 12;
+const DEFAULT_EVENT_BUFFER_SIZE: usize = 6;
 
 /// The cross-platform hardware device event lister
 #[derive(FromArgs)]
 struct Opt {
-    /// the amount of keyboard events that can be displayed at once
-    #[argh(option, short = 'k')]
-    max_keyboard_events: Option<usize>,
-
-    /// the amount of keyboard events that can be displayed at once
+    /// total amount of events that can be displayed at once
     #[argh(option, short = 'm')]
-    max_mouse_events: Option<usize>,
+    max_events: Option<usize>,
 }
 
 type EResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+const HANDLED_EVENT_VARIANTS: usize = 3; // not using syn; want to have acceptable compile-times
 #[derive(Debug, Clone)]
 pub(crate) enum HandledEvent {
     Keyboard(KeyboardInput),
@@ -40,6 +37,16 @@ pub(crate) enum HandledEvent {
     MouseScroll(MouseScrollDelta),
 }
 
+impl HandledEvent {
+    fn variant(&self) -> &'static str {
+        match self {
+            HandledEvent::Keyboard(_) => "Keyboard",
+            HandledEvent::MouseButton { .. } => "MouseButton",
+            HandledEvent::MouseScroll(_) => "MouseScroll",
+        }
+    }
+}
+
 mod template {
     use crate::HandledEvent;
     use sailfish::TemplateOnce;
@@ -47,9 +54,8 @@ mod template {
     #[derive(Debug, TemplateOnce)]
     #[template(path = "all.stpl")]
     pub(crate) struct All {
-        // @TODO: unify into one vec and make it the templates' job to display the right events
-        pub keyboard_events: Vec<HandledEvent>,
-        pub mouse_events: Vec<HandledEvent>,
+        pub events: Vec<HandledEvent>,
+        pub buffer_size: usize,
     }
 }
 
@@ -71,34 +77,36 @@ async fn main() -> EResult<()> {
 async fn tui_loop(opt: Opt, rx: Receiver<HandledEvent>) -> EResult<()> {
     let term = Term::stdout();
 
-    let keyboard_buffer_size = opt
-        .max_keyboard_events
-        .unwrap_or(DEFAULT_KEYBOARD_BUFFER_SIZE);
-    let mouse_buffer_size = opt.max_mouse_events.unwrap_or(DEFAULT_MOUSE_BUFFER_SIZE);
-    let mut keyboard_event_buffer = Vec::with_capacity(keyboard_buffer_size);
-    let mut mouse_event_buffer = Vec::with_capacity(mouse_buffer_size);
+    let buffer_size = opt.max_events.unwrap_or(DEFAULT_EVENT_BUFFER_SIZE);
+    let mut event_buffer = Vec::with_capacity(buffer_size * HANDLED_EVENT_VARIANTS); // accomedate for combined variants size
+    let mut variant_count: HashMap<&'static str, usize> = HashMap::new();
+
+    // initialise hashmap with count defaults
+    variant_count.insert("Keyboard", 0);
+    variant_count.insert("MouseButton", 0);
+    variant_count.insert("MouseScroll", 0);
 
     while let Ok(event) = rx.recv().await {
-        match event {
-            HandledEvent::Keyboard(_) => &mut keyboard_event_buffer,
-            HandledEvent::MouseButton { .. } | HandledEvent::MouseScroll(_) => {
-                &mut mouse_event_buffer
-            }
+        let variant = event.variant();
+        let count = variant_count.get_mut(&variant).unwrap();
+        if &*count <= &buffer_size {
+            event_buffer.push(event);
         }
-        .push(event);
+        *count += 1;
 
-        // clear buffers
-        if keyboard_event_buffer.len() > keyboard_buffer_size {
-            keyboard_event_buffer.remove(0);
-        }
-        if mouse_event_buffer.len() > mouse_buffer_size {
-            mouse_event_buffer.remove(0);
+
+        // remove the first event in buffer with same variant as current event
+        if let Some(first_variant_index) = event_buffer.iter().position(|event| variant == event.variant()) {
+            if &*count >= &(buffer_size + 1) {
+                event_buffer.remove(first_variant_index);
+                *count -= 1;
+            }
         }
 
         // render template in advance to avoid unnecessary waiting
         let template = template::All {
-            keyboard_events: keyboard_event_buffer.clone(),
-            mouse_events: mouse_event_buffer.clone(),
+            events: event_buffer.clone(),
+            buffer_size,
         };
         let render = template.render_once()?;
 
