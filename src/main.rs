@@ -104,7 +104,10 @@ async fn tui_loop(opt: Opt, rx: Receiver<HandledEvent>) -> EResult<()> {
         *totals.get_mut(&variant).unwrap() += 1;
 
         // remove the first event in buffer with same variant as current event
-        if let Some(first_variant_index) = event_buffer.iter().position(|event| variant == event.variant()) {
+        if let Some(first_variant_index) = event_buffer
+            .iter()
+            .position(|event| variant == event.variant())
+        {
             if &*count >= &(buffer_size + 1) {
                 event_buffer.remove(first_variant_index);
                 *count -= 1;
